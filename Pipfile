@@ -11,7 +11,7 @@ pylint = "*"
 [packages]
 hncrawl = {editable = true,path = "."}
 beautifulsoup4 = "*"
-requests = "*"
+aiohttp = "*"
 
 [requires]
 python_version = "3.8"
