@@ -1,16 +1,27 @@
 from asyncio import Queue, create_task, gather, run, sleep
 from logging import DEBUG, INFO, basicConfig, getLogger
+from optparse import OptionParser
 from sys import stderr
 
 from aiohttp import ClientSession
 
 from .hn import RateLimitError, get_index_stories
 
-basicConfig(level=INFO, stream=stderr)
 logger = getLogger(__name__)
 
 
 def main():
+    parser = OptionParser()
+    parser.add_option("-v",
+                      "--verbose",
+                      dest="verbose",
+                      action="store_true",
+                      default=False,
+                      help="Verbosely log crawling process")
+
+    (options, args) = parser.parse_args()
+    basicConfig(level=(DEBUG if options.verbose else INFO), stream=stderr)
+
     run(_main())
 
 
