@@ -1,8 +1,13 @@
 from asyncio import Queue, create_task, gather, run, sleep
+from logging import DEBUG, INFO, basicConfig, getLogger
+from sys import stderr
 
 from aiohttp import ClientSession
 
 from .hn import RateLimitError, get_index_stories
+
+basicConfig(level=INFO, stream=stderr)
+logger = getLogger(__name__)
 
 
 def main():
@@ -13,38 +18,45 @@ async def _worker(i, queue, session):
     while True:
         try:
             story = await queue.get()
-            print("Worker {} handling {}".format(i, story.id_))
+            logger.debug("Worker {} handling {}".format(i, story.id_))
             await story.get_comments(session)
         except RateLimitError as e:
-            print("Worker {} encountered error: {}".format(i, e.message))
+            logger.warn("Worker {} encountered error: {}".format(i, e.message))
             await sleep(1)
             await queue.put(story)
         finally:
             queue.task_done()
-            print("Worker {} done, {} in queue".format(i, queue.qsize()))
+            logger.debug("Worker {} done, {} in queue".format(
+                i, queue.qsize()))
 
 
-async def _main(max_workers=10):
+async def _main(max_workers=3):
     async with ClientSession() as session:
         queue = Queue(maxsize=max_workers)
         workers = [
             create_task(_worker(i, queue, session)) for i in range(max_workers)
         ]
 
+        logger.info("Getting front page stories from Hacker News")
         stories = await get_index_stories(session)
 
+        logger.info("Reading the comments for the front page stories")
         for story in stories:
             await queue.put(story)
 
-        print("Awaiting queue")
+        logger.debug("Awaiting queue")
         await queue.join()
 
         for worker in workers:
             worker.cancel()
 
-        print("Canceling workers")
+        logger.debug("Canceling workers")
         await gather(*workers, return_exceptions=True)
 
     for story in stories:
+        print()
         print(story)
-        print(story.top_words)
+        if story.comment_count > 0:
+            print("    Top 5 words:")
+            for (count, word) in story.top_words:
+                print("    - {} ({})".format(word, count))

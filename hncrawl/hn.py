@@ -1,9 +1,12 @@
 import re
 from collections import Counter
+from logging import getLogger
 from os import path
 
 from aiohttp import request
 from bs4 import BeautifulSoup
+
+logger = getLogger(__name__)
 
 fail_message = "Sorry, we're not able to serve your requests this quickly."
 words = re.compile(r"[A-Za-z']+")
@@ -24,14 +27,18 @@ class Story:
         self.id_ = id_
         self.rank = rank
         self.title = title
+        self.comment_count = 0
         self.comments = []
         self.top_words = []
 
     def __repr__(self):
-        return "{}. {} ({})".format(self.rank, self.title, self.id_)
+        return "{}. {} [{}] ({} comment{})".format(
+            self.rank, self.title, self.id_, self.comment_count,
+            "" if self.comment_count == 1 else "s")
 
     async def get_comments(self, session):
         self.comments = await get_story_comments(session, self.id_)
+        self.comment_count = len(self.comments)
         self._get_top_comment_words()
 
     def _get_top_comment_words(self):
@@ -53,7 +60,7 @@ async def get_index_stories(session):
 
 
 async def get_story_comments(session, id_):
-    print("Getting comments for {}".format(id_))
+    logger.debug("Getting comments for {}".format(id_))
     story = await _get(session,
                        "https://news.ycombinator.com/item?id={}".format(id_))
     story_soup = BeautifulSoup(story, "html.parser")
@@ -65,7 +72,7 @@ async def get_story_comments(session, id_):
 
     if len(comments) > 0 or "".join(
             s for s in story_soup.strings).find(fail_message) == -1:
-        print("Got {} comments for {}".format(len(comments), id_))
+        logger.debug("Got {} comments for {}".format(len(comments), id_))
         return comments
 
     raise RateLimitError(id_)
