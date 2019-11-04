@@ -1,2 +1,5 @@
+from .hn import get_index_stories, get_story_comments
+
+
 def main():
-    print("hncrawl")
+    stories = get_index_stories()
